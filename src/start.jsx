@@ -8,9 +8,9 @@ export default function Start({ onStart }) {
     await Tone.start(); // 啟動 AudioContext
     console.log("AudioContext 已啟動");
 
-    //  測試音
+    
     const synth = new Tone.Synth().toDestination();
-    // 每個 item 代表一個和弦
+    //  測試音
     const melody = [
     { note: "A3", duration: "8n", time: 0, velocity: 0.2 },
     { note: "D4", duration: "8n", time: 0.5, velocity: 0.4 },
