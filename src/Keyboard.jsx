@@ -19,21 +19,22 @@ export default function Keyboard({
   };
 
 
-  // 播放音符
-  const playNote = async (note) => {
-  const ctx = Tone.getContext();  
-  if (ctx.state !== "running") {
-    await ctx.resume();
-  }
+  // 播放音符（不再每次 resume）
+const playNote = (note) => {
+  const synth = synthsRef.current?.[currentInstrument];
+  if (!synth) return;
 
   const noteName = note.slice(0, -1);
   let noteOctave = parseInt(note.slice(-1), 10) + octaveOffset;
   noteOctave = Math.max(0, Math.min(8, noteOctave));
   const newNote = noteName + noteOctave;
 
-  const synth = synthsRef.current[currentInstrument];
-  synth.triggerAttackRelease(newNote, "8n");
+  synth.triggerAttackRelease(newNote, "4n");
+
 };
+
+
+
 
   const handleKeyDown = useCallback(
     (e) => {

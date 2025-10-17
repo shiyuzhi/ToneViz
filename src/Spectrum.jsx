@@ -1,49 +1,46 @@
-// src/spectrum.jsx
-import React, { useEffect, useRef } from "react";
+// SpectrumTest.jsx
+import { useEffect, useRef } from "react";
 
-export default function Spectrum({ analyserRef }) {
-  const canvasRef = useRef(null);
+export default function SpectrumTest() {
+  const canvas = useRef();
 
   useEffect(() => {
-    if (!analyserRef?.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const analyser = analyserRef.current;
-    const dataArray = new Float32Array(analyser.size);
-
-    analyser.smoothing = 0.8;
+    const c = canvas.current;
+    const ctx = c.getContext("2d");
 
     const resize = () => {
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = 150;
+      c.width = c.parentElement.clientWidth;
+      c.height = 150;
     };
     resize();
     window.addEventListener("resize", resize);
 
+    const fftLength = 256; // 模擬 FFT 長度
+
     const draw = () => {
       requestAnimationFrame(draw);
 
-      analyser.getValue(dataArray);
+      // 模擬資料，-1 ~ 1
+      const data = Array.from({ length: fftLength }, () => Math.random() * 2 - 1);
 
-      
-      ctx.fillStyle = "rgba(17,17,17,0.3)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(0,0,0,0.1)";
+      ctx.fillRect(0, 0, c.width, c.height);
 
-      const barWidth = canvas.width / dataArray.length;
-      for (let i = 0; i < dataArray.length; i++) {
-        const v = (dataArray[i] + 1) / 2;
-        const y = v * canvas.height * 5; // 放大
+      const w = c.width / data.length;
+      const midY = c.height / 2;
 
-        ctx.fillStyle = `hsl(${(i / dataArray.length) * 360}, 100%, ${40 + v * 50}%)`;
-        ctx.fillRect(i * barWidth, canvas.height - y, barWidth, y);
+      for (let i = 0; i < data.length; i++) {
+        const magnitude = Math.abs(data[i]); 
+        const y = magnitude * (c.height / 4);  
+        ctx.fillStyle = "lime";
+        ctx.fillRect(i * w, midY - y, w * 0.9, y * 2); 
       }
     };
 
     draw();
 
     return () => window.removeEventListener("resize", resize);
-  }, [analyserRef]);
+  }, []);
 
-  return <canvas ref={canvasRef} style={{ width: "100%", height: "180px", background: "#111", display: "block" }} />;
+  return <canvas ref={canvas} style={{ width: "100%", height: "150px", background: "#111" }} />;
 }
