@@ -4,14 +4,12 @@
   padding-right: 1rem;
 }
 
-/* 右側按鈕群垂直堆疊 */
 .responsive-buttons > button,
 .responsive-buttons > .dropdown {
-  width: 180px;          /* 固定寬度，看起來整齊 */
+  width: 180px;         
   text-align: center;
 }
 
-/* 手機小螢幕可縮小寬度 */
 @media (max-width: 576px) {
   .responsive-buttons > button,
   .responsive-buttons > .dropdown {

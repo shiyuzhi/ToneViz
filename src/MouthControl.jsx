@@ -105,7 +105,7 @@ export default function MouthControl({
   }, [lyrics]);
 
   return (
-    <div style={{ width: "100%", maxWidth: 600, borderRadius: 8, color: "#eee" }}>
+      <div style={{ width: "100%",  maxHeight: 400, maxWidth: 400, borderRadius: 8,objectFit: "contain", color: "#eee" }}>
       <video ref={videoRef} autoPlay style={{ width: "100%", borderRadius: 8, marginBottom: "0.5rem" }} />
       <div style={{ marginTop: 12, minHeight: 36, textAlign: "center", fontSize: 18, color: "#dcdcdc" }}>
         {currentLyric}

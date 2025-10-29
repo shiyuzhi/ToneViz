@@ -6,6 +6,8 @@ import Spectrum from "./Spectrum.jsx";
 import Keyboard from "./Keyboard.jsx";
 import MouthControl from "./MouthControl.jsx";
 import VoiceControl from "./VoiceControl.jsx";
+import MidiLyricsDemo  from "./MidiLyricsDemo.jsx";
+import DraggableSpectrum from "./DraggableSpectrum.jsx";
 import * as Tone from "tone";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
@@ -102,14 +104,32 @@ export default function Home() {
             </div>
           </nav>
 
-          {/* 選單 */}
-          <div className="position-absolute top-0 start-0 p-3" style={{ zIndex: 20 }}>
-            {instrumentVisible && <Instrument current={currentInstrument} onChange={setCurrentInstrument} />}
-            {midiVisible && <MidiPlayer ref={midiPlayerRef} synthsRef={synthsRef} songs={allSongs} onSongLoaded={handleSongLoaded} onSongUploaded={setAllSongs} />}
-            {mouthVisible && <MouthControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} onSelectSong={setCurrentSong} />}
-            {voiceVisible && <VoiceControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} />}
-            {spectrumVisible && <Spectrum analyserRef={analyserRef} />}
+          {/* 選單區改成三欄布局 */}
+          <div className="position-absolute top-0 start-0 end-0" style={{ zIndex: 20, paddingTop: "40px", paddingBottom: "120px", display: "flex", gap: "1rem" }}>
+            
+            {/* MIDI 播放器區 */}
+            <div style={{ flex: 1, backgroundColor: "#222", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
+              {midiVisible && <MidiPlayer ref={midiPlayerRef} synthsRef={synthsRef} songs={allSongs} onSongLoaded={handleSongLoaded} onSongUploaded={setAllSongs} />}
+            </div>
+
+            {/* 辨識區 */}
+            <div style={{ flex: 1, backgroundColor: "#333", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
+              {mouthVisible && <MouthControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} onSelectSong={setCurrentSong} />}
+              {voiceVisible && <VoiceControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} />}
+            </div>
+
+            {/* 歌詞區 */}
+            <div style={{ flex: 1, backgroundColor: "#111", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
+              <MidiLyricsDemo />
+            </div>
+
           </div>
+           
+           {/*頻譜顯示區*/}
+           {spectrumVisible && (
+              <DraggableSpectrum analyserRef={analyserRef} />
+           )}
+
 
           {/* 下方鍵盤 */}
           {keyboardVisible && (
