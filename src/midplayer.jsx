@@ -1,21 +1,20 @@
-// src/MidiPlayer.jsx
+// MidiPlayer.jsx
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Midi } from "@tonejs/midi";
 import * as Tone from "tone";
 
 const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSongLoaded, onSongUploaded }, ref) {
   const [uploadedSongs, setUploadedSongs] = useState([]);
-  const allSongs = [...(songs || []), ...uploadedSongs]; // 合併內建 + 上傳
+  const allSongs = [...(songs || []), ...uploadedSongs];
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const partRef = useRef(null);
+  const lyricPartRef = useRef(null);
   const durationRef = useRef(0);
   const rafRef = useRef(null);
   const volumeRef = useRef(new Tone.Volume(-12).toDestination());
-
-
 
   useImperativeHandle(ref, () => ({
     playSong: (song) => handleLoadSong(song),
@@ -41,7 +40,6 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     const midi = new Midi(arrayBuffer);
     durationRef.current = midi.duration || 0;
 
-    // 解析歌詞
     const lyricsSet = new Set();
     const lyrics = [];
     midi.tracks.forEach(track => {
@@ -54,10 +52,9 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     });
     lyrics.sort((a, b) => a.time - b.time);
 
-    const songObj = { id: Date.now(), name: file.name, file, lyrics };
+    const songObj = { id: Date.now(), name: file.name, file, lyricsJson: lyrics };
     setUploadedSongs(prev => [...prev, songObj]);
 
-    // 通知 Home 更新
     onSongUploaded?.([...uploadedSongs, songObj]);
     onSongLoaded?.(songObj);
     setCurrentSong(songObj);
@@ -67,11 +64,8 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     if (!song) return;
     if (currentSong?.id !== song.id) setCurrentSong(song);
 
-    if (partRef.current) {
-      partRef.current.stop();
-      partRef.current.dispose();
-      partRef.current = null;
-    }
+    if (partRef.current) { partRef.current.stop(); partRef.current.dispose(); partRef.current = null; }
+    if (lyricPartRef.current) { lyricPartRef.current.stop(); lyricPartRef.current.dispose(); lyricPartRef.current = null; }
 
     let arrayBuffer;
     if (song.file) arrayBuffer = await song.file.arrayBuffer();
@@ -83,7 +77,6 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     const midi = new Midi(arrayBuffer);
     durationRef.current = midi.duration || 0;
 
-    // 解析歌詞
     const lyricsSet = new Set();
     const lyrics = [];
     midi.tracks.forEach(track => {
@@ -95,7 +88,8 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
       });
     });
     lyrics.sort((a, b) => a.time - b.time);
-    const songWithLyrics = { ...song, lyrics };
+
+    const songWithLyrics = { ...song, lyricsJson: lyrics };
     setCurrentSong(songWithLyrics);
     onSongLoaded?.(songWithLyrics);
 
@@ -113,8 +107,14 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     const part = new Tone.Part((time, value) => {
       synth.triggerAttackRelease(value.note, value.duration, time, value.velocity);
     }, events);
-    part.start(0, Tone.Transport.seconds);
+    part.start(0);
     partRef.current = part;
+
+    const lyricPart = new Tone.Part((time, value) => {
+      setCurrentSong(prev => ({ ...prev, lyricsText: (prev.lyricsText || "") + value.text }));
+    }, lyrics.map(l => ({ time: l.time, text: l.text })));
+    lyricPart.start(0);
+    lyricPartRef.current = lyricPart;
 
     Tone.Transport.stop();
     Tone.Transport.seconds = 0;
@@ -123,12 +123,12 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
   };
 
   const handlePlayPause = () => {
-    if (Tone.Transport.state === "started") {
-      Tone.Transport.pause();
+    if (transport.state === "started") {
+      transport.pause();
       setIsPlaying(false);
     } else {
       Tone.start();
-      Tone.Transport.start();
+      transport.start();
       setIsPlaying(true);
       rafRef.current = requestAnimationFrame(updateProgress);
     }
@@ -136,27 +136,32 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
 
   const handleStop = () => {
     if (partRef.current) partRef.current.stop();
+    if (lyricPartRef.current) lyricPartRef.current.stop();
     Tone.Transport.stop();
     Tone.Transport.seconds = 0;
     setProgress(0);
     setIsPlaying(false);
+    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
   };
 
   const handleSeek = (e) => {
     const rect = e.target.getBoundingClientRect();
     const pct = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
     const newTime = durationRef.current * pct;
-    Tone.Transport.seconds = newTime;
+    transport.seconds = newTime;
     if (partRef.current) partRef.current.start(0, newTime);
+    if (lyricPartRef.current) lyricPartRef.current.start(0, newTime);
     setProgress(newTime);
+    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
   };
 
   const styles = {
-    wrapper: { maxWidth: "400px", margin: "2rem auto", padding: "1rem", backgroundColor: "#111", borderRadius: "12px", color: "#eee", fontFamily: "Segoe UI, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" },
-    songList: { display: "flex", gap: "0.5rem", overflowX: "auto", padding: "0.5rem 0" },
-    songCard: { flex: "0 0 200px", padding: "0.6rem", borderRadius: "10px", background: "#222", textAlign: "center", transition: "transform 0.2s", cursor: "pointer" },
+    wrapper: { maxWidth: "1000px", margin: "2rem auto", padding: "1rem", backgroundColor: "#111", borderRadius: "12px", color: "#eee", fontFamily: "Segoe UI, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.5)", display: "flex", gap: "1rem", alignItems: "flex-start" },
+    songList: { display: "flex", flexDirection: "row", gap: "0.5rem", overflowX: "auto" },
+    songCard: { flex: "0 0 150px", padding: "0.6rem", borderRadius: "10px", background: "#222", textAlign: "center", transition: "transform 0.2s", cursor: "pointer" },
     songCardActive: { background: "#333", transform: "scale(1.05)" },
     button: { padding: "0.3rem 0.6rem", margin: "0.2rem", border: "none", borderRadius: "6px", background: "#4a90e2", color: "#fff", cursor: "pointer", transition: "background 0.2s" },
+    controlArea: { display: "flex", flexDirection: "column", gap: "0.5rem", flexGrow: 1 },
     progressBar: { height: "6px", background: "#333", borderRadius: "3px", marginTop: "0.5rem", cursor: "pointer" },
     progressFilled: { height: "100%", background: "#4a90e2", borderRadius: "3px", width: durationRef.current ? `${(progress / durationRef.current) * 100}%` : "0%" },
     timeText: { fontSize: "0.75rem", color: "#888", textAlign: "right", marginTop: "0.2rem" },
@@ -164,10 +169,9 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
 
   return (
     <div style={styles.wrapper}>
-      <h3 style={{ marginBottom: "0.5rem" }}>MIDI Player</h3>
-      <input type="file" accept=".mid" onChange={handleUpload} style={{ width: "100%", marginBottom: "0.5rem" }} />
+      {/* 歌單 */}
       <div style={styles.songList}>
-        {songs.map(song => (
+        {allSongs.map(song => (
           <div
             key={song.id}
             style={{ ...styles.songCard, ...(currentSong?.id === song.id ? styles.songCardActive : {}) }}
@@ -177,18 +181,23 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-        <button style={styles.button} onClick={handlePlayPause}>{isPlaying ? "暫停" : "播放"}</button>
-        <button style={styles.button} onClick={handleStop}>停止</button>
-      </div>
-      <div style={styles.progressBar} onClick={handleSeek}>
-        <div style={styles.progressFilled}></div>
-      </div>
-      {durationRef.current > 0 && (
-        <div style={styles.timeText}>
-          {Math.floor(progress / 60)}:{("0" + Math.floor(progress % 60)).slice(-2)} / {Math.floor(durationRef.current / 60)}:{("0" + Math.floor(durationRef.current % 60)).slice(-2)}
+
+      {/* 控制區 */}
+      <div style={styles.controlArea}>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button style={styles.button} onClick={handlePlayPause}>{isPlaying ? "暫停" : "播放"}</button>
+          <button style={styles.button} onClick={handleStop}>停止</button>
         </div>
-      )}
+        <div style={styles.progressBar} onClick={handleSeek}>
+          <div style={styles.progressFilled}></div>
+        </div>
+        {durationRef.current > 0 && (
+          <div style={styles.timeText}>
+            {Math.floor(progress / 60)}:{("0" + Math.floor(progress % 60)).slice(-2)} / {Math.floor(durationRef.current / 60)}:{("0" + Math.floor(durationRef.current % 60)).slice(-2)}
+          </div>
+        )}
+        <input type="file" accept=".mid" onChange={handleUpload} style={{ width: "100%", marginTop: "0.5rem" }} />
+      </div>
     </div>
   );
 });

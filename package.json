@@ -12,10 +12,14 @@
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@popperjs/core": "^2.11.8",
     "@tonejs/midi": "^2.0.28",
     "bootstrap": "^5.3.8",
+    "encoding-japanese": "^2.2.0",
+    "midi-parser-js": "^4.0.4",
     "pixi.js": "^8.13.2",
     "react": "^19.1.1",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.1",
     "tone": "^15.1.22"
   },

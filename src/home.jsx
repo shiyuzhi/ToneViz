@@ -1,28 +1,27 @@
-// src/Home.jsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import Start from "./start.jsx";
 import Instrument from "./Instrument.jsx";
 import MidiPlayer from "./midplayer.jsx";
 import Spectrum from "./Spectrum.jsx";
 import Keyboard from "./Keyboard.jsx";
 import MouthControl from "./MouthControl.jsx";
-import VoiceControl from "./voicecontrol.jsx";
+import VoiceControl from "./VoiceControl.jsx";
 import * as Tone from "tone";
-import "bootstrap/dist/css/bootstrap.min.css";
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import './Home.css';
 
 export default function Home() {
   const [started, setStarted] = useState(false);
   const [currentInstrument, setCurrentInstrument] = useState("piano");
   const [octaveOffset, setOctaveOffset] = useState(0);
-  const [keyboardVisible, setKeyboardVisible] = useState(true);
 
+  const [keyboardVisible, setKeyboardVisible] = useState(true);
   const [instrumentVisible, setInstrumentVisible] = useState(false);
   const [midiVisible, setMidiVisible] = useState(false);
   const [mouthVisible, setMouthVisible] = useState(false);
   const [voiceVisible, setVoiceVisible] = useState(false);
   const [spectrumVisible, setSpectrumVisible] = useState(false);
-
-  
 
   const analyserRef = useRef(null);
   const synthsRef = useRef(null);
@@ -60,8 +59,6 @@ export default function Home() {
     });
     analyserRef.current.connect(Tone.getDestination());
 
-    if (synthsRef.current.piano.maxPolyphony !== undefined) synthsRef.current.piano.maxPolyphony = 15;
-
     setStarted(true);
   };
 
@@ -76,136 +73,48 @@ export default function Home() {
 
       {started && (
         <div className="vh-100 vw-100 bg-dark text-light position-relative overflow-hidden">
-          <div className="position-absolute top-0 start-0 p-3" style={{ zIndex: 20 }}>
+
+          {/* Navbar */}
+          <nav className="navbar navbar-expand-lg navbar-dark bg-dark position-absolute top-0 w-100" style={{ zIndex: 50 }}>
             <div className="container-fluid">
-              <div className="row g-3 align-items-start">
+              <a className="navbar-brand" href="#">音樂系統</a>
 
-                {/* Instrument */}
-                <div className="col-auto">
-                  <div className="card bg-secondary text-light shadow">
-                    <div className="card-header p-2">
-                      <button className="btn btn-sm btn-outline-light" onClick={() => setInstrumentVisible(!instrumentVisible)}>
-                        {instrumentVisible ? "▼" : "▶"} 樂器
-                      </button>
-                    </div>
-                    {instrumentVisible && (
-                      <div className="card-body p-2">
-                        <Instrument
-                          current={currentInstrument}
-                          onChange={setCurrentInstrument}
-                          toggleKeyboard={() => setKeyboardVisible(!keyboardVisible)}
-                          toggleSpectrum={() => setSpectrumVisible(!spectrumVisible)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span className="navbar-toggler-icon"></span>
+              </button>
 
-                {/* MIDI Player */}
-                <div className="col-auto">
-                  <div className="card bg-secondary text-light shadow" style={{ zIndex: 15 }}>
-                    <div className="card-header p-2">
-                      <button className="btn btn-sm btn-outline-light" onClick={() => setMidiVisible(!midiVisible)}>
-                        {midiVisible ? "▼" : "▶"} MIDI 播放器
-                      </button>
-                    </div>
-                    {midiVisible && (
-                      <div className="card-body p-2">
-                        <MidiPlayer
-                          ref={midiPlayerRef}
-                          synthsRef={synthsRef}
-                          songs={allSongs}       // 統一由 Home 提供
-                          onSongLoaded={handleSongLoaded}
-                          onSongUploaded={setAllSongs} // 新增
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Mouth Control */}
-                <div className="col-auto">
-                  <div className="card bg-secondary text-light shadow">
-                    <div className="card-header p-2">
-                      <button className="btn btn-sm btn-outline-light" onClick={() => setMouthVisible(!mouthVisible)}>
-                        {mouthVisible ? "▼" : "▶"} Mouth Control
-                      </button>
-                    </div>
-                    {mouthVisible && (
-                      <div className="card-body p-2">
-                        <MouthControl
-                          synthsRef={synthsRef}
-                          currentInstrument={currentInstrument}
-                          midiPlayerRef={midiPlayerRef}
-                          currentSong={currentSong}
-                          setCurrentSong={setCurrentSong}
-                          songs={allSongs}
-                          onSelectSong={setCurrentSong} // 選歌時更新 currentSong
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-               {/* Voice Control */}
-                <div className="col-auto">
-                  <div className="card bg-secondary text-light shadow">
-                    <div className="card-header p-2">
-                      <button
-                        className="btn btn-sm btn-outline-light"
-                        onClick={() => setVoiceVisible(!voiceVisible)}
-                      >
-                        {voiceVisible ? "▼" : "▶"} Voice Control
-                      </button>
-                    </div>
-                    {voiceVisible && (
-                      <div className="card-body p-2">
-                        <VoiceControl
-                          synthsRef={synthsRef}
-                          currentInstrument={currentInstrument}
-                          midiPlayerRef={midiPlayerRef}
-                          currentSong={currentSong}
-                          setCurrentSong={setCurrentSong}
-                          songs={allSongs}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-
-                {/* Spectrum */}
-                <div className="col-auto">
-                  <div className="card bg-secondary text-light shadow">
-                    <div className="card-header p-2">
-                      <button className="btn btn-sm btn-outline-light" onClick={() => setSpectrumVisible(!spectrumVisible)}>
-                        {spectrumVisible ? "▼" : "▶"} 頻譜
-                      </button>
-                    </div>
-                    {spectrumVisible && (
-                      <div className="card-body p-2">
-                       <Spectrum analyserRef={analyserRef} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-
+              <div className="collapse navbar-collapse" id="navbarContent">
+                <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+                  <li className="nav-item dropdown">
+                    <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      功能選單
+                    </a>
+                    <ul className="dropdown-menu">
+                      <li><button className="dropdown-item" onClick={() => setKeyboardVisible(!keyboardVisible)}>鍵盤 {keyboardVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setSpectrumVisible(!spectrumVisible)}>頻譜 {spectrumVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setMidiVisible(!midiVisible)}>MIDI 播放器 {midiVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setMouthVisible(!mouthVisible)}>Mouth Control {mouthVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setVoiceVisible(!voiceVisible)}>Voice Control {voiceVisible ? "▼" : "▶"}</button></li>
+                    </ul>
+                  </li>
+                </ul>
               </div>
             </div>
+          </nav>
+
+          {/* 選單 */}
+          <div className="position-absolute top-0 start-0 p-3" style={{ zIndex: 20 }}>
+            {instrumentVisible && <Instrument current={currentInstrument} onChange={setCurrentInstrument} />}
+            {midiVisible && <MidiPlayer ref={midiPlayerRef} synthsRef={synthsRef} songs={allSongs} onSongLoaded={handleSongLoaded} onSongUploaded={setAllSongs} />}
+            {mouthVisible && <MouthControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} onSelectSong={setCurrentSong} />}
+            {voiceVisible && <VoiceControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} />}
+            {spectrumVisible && <Spectrum analyserRef={analyserRef} />}
           </div>
-            
+
           {/* 下方鍵盤 */}
           {keyboardVisible && (
             <div className="position-absolute bottom-0 start-0 w-100" style={{ zIndex: 10, backgroundColor: "#111" }}>
-              <Keyboard
-                synthsRef={synthsRef}
-                analyserRef={analyserRef}
-                currentInstrument={currentInstrument}
-                setCurrentInstrument={setCurrentInstrument}
-                octaveOffset={octaveOffset}
-                setOctaveOffset={setOctaveOffset}
-              />
+              <Keyboard synthsRef={synthsRef} analyserRef={analyserRef} currentInstrument={currentInstrument} setCurrentInstrument={setCurrentInstrument} octaveOffset={octaveOffset} setOctaveOffset={setOctaveOffset} />
             </div>
           )}
         </div>
