@@ -94,7 +94,7 @@ export default function MouthControl({
         return;
       }
 
-      const t = Tone.Transport.seconds;
+      const t = transport.seconds;
 
       // 找到目前時間前最近的一個歌詞
       const current = lyrics.filter(l => l.time <= t).pop();

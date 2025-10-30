@@ -16,6 +16,12 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
   const rafRef = useRef(null);
   const volumeRef = useRef(new Tone.Volume(-12).toDestination());
 
+  // 建立固定 synth，只做一次
+  if (!volumeRef.current.synth) {
+    volumeRef.current.synth = synthsRef?.current?.piano || new Tone.PolySynth().toDestination();
+    volumeRef.current.synth.connect(volumeRef.current);
+  }
+
   useImperativeHandle(ref, () => ({
     playSong: (song) => handleLoadSong(song),
     stop: () => handleStop(),
@@ -54,7 +60,6 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
 
     const songObj = { id: Date.now(), name: file.name, file, lyricsJson: lyrics };
     setUploadedSongs(prev => [...prev, songObj]);
-
     onSongUploaded?.([...uploadedSongs, songObj]);
     onSongLoaded?.(songObj);
     setCurrentSong(songObj);
@@ -62,10 +67,17 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
 
   const handleLoadSong = async (song) => {
     if (!song) return;
-    if (currentSong?.id !== song.id) setCurrentSong(song);
 
+    // 停掉舊 Part
     if (partRef.current) { partRef.current.stop(); partRef.current.dispose(); partRef.current = null; }
     if (lyricPartRef.current) { lyricPartRef.current.stop(); lyricPartRef.current.dispose(); lyricPartRef.current = null; }
+    Tone.Transport.stop();
+    Tone.Transport.seconds = 0;
+    setProgress(0);
+    setIsPlaying(false);
+    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
+
+    setCurrentSong(song);
 
     let arrayBuffer;
     if (song.file) arrayBuffer = await song.file.arrayBuffer();
@@ -77,6 +89,7 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     const midi = new Midi(arrayBuffer);
     durationRef.current = midi.duration || 0;
 
+    // 解析歌詞
     const lyricsSet = new Set();
     const lyrics = [];
     midi.tracks.forEach(track => {
@@ -93,10 +106,9 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     setCurrentSong(songWithLyrics);
     onSongLoaded?.(songWithLyrics);
 
-    const synth = synthsRef?.current?.piano || new Tone.PolySynth().toDestination();
-    try { synth.disconnect(); } catch (e) {}
-    synth.connect(volumeRef.current);
+    const synth = volumeRef.current.synth;
 
+    // 解析音符
     const events = [];
     midi.tracks.forEach(track =>
       track.notes.forEach(note =>
@@ -115,20 +127,15 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     }, lyrics.map(l => ({ time: l.time, text: l.text })));
     lyricPart.start(0);
     lyricPartRef.current = lyricPart;
-
-    Tone.Transport.stop();
-    Tone.Transport.seconds = 0;
-    setProgress(0);
-    setIsPlaying(false);
   };
 
-  const handlePlayPause = () => {
-    if (transport.state === "started") {
-      transport.pause();
+  const handlePlayPause = async () => {
+    await Tone.start();
+    if (Tone.Transport.state === "started") {
+      Tone.Transport.pause();
       setIsPlaying(false);
     } else {
-      Tone.start();
-      transport.start();
+      Tone.Transport.start();
       setIsPlaying(true);
       rafRef.current = requestAnimationFrame(updateProgress);
     }
@@ -148,7 +155,7 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     const rect = e.target.getBoundingClientRect();
     const pct = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
     const newTime = durationRef.current * pct;
-    transport.seconds = newTime;
+    Tone.Transport.seconds = newTime;
     if (partRef.current) partRef.current.start(0, newTime);
     if (lyricPartRef.current) lyricPartRef.current.start(0, newTime);
     setProgress(newTime);
@@ -169,7 +176,6 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
 
   return (
     <div style={styles.wrapper}>
-      {/* 歌單 */}
       <div style={styles.songList}>
         {allSongs.map(song => (
           <div
@@ -181,8 +187,6 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
           </div>
         ))}
       </div>
-
-      {/* 控制區 */}
       <div style={styles.controlArea}>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button style={styles.button} onClick={handlePlayPause}>{isPlaying ? "暫停" : "播放"}</button>

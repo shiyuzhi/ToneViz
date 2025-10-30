@@ -1,14 +1,15 @@
-// src/MidiLyricsDemo.jsx
-import React, { useState, useRef, useEffect } from "react";
+// src/MidiLyricsDemoKaraokeScroll.jsx
+import React, { useState, useRef } from "react";
 import MidiParser from "midi-parser-js";
 import Encoding from "encoding-japanese";
 
-export default function MidiLyricsDemo() {
+export default function MidiLyricsDemoKaraokeScroll() {
   const [currentSong, setCurrentSong] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
   const intervalRef = useRef(null);
-  const lyricsRefs = useRef([]);
-  const lastScrolledIndex = useRef(-1);
+  const startTimestamp = useRef(0);
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
@@ -29,7 +30,6 @@ export default function MidiLyricsDemo() {
       track.event.forEach((ev) => {
         currentTick += ev.deltaTime;
 
-        // tempo event
         if (ev.metaType === 0x51 && ev.data && ev.data.length === 3) {
           const microsecondsPerBeat =
             (ev.data[0] << 16) + (ev.data[1] << 8) + ev.data[2];
@@ -38,7 +38,6 @@ export default function MidiLyricsDemo() {
           }
         }
 
-        // lyric event
         if (ev.metaType === 0x05 && ev.data) {
           let byteArr = Array.isArray(ev.data)
             ? ev.data
@@ -55,6 +54,7 @@ export default function MidiLyricsDemo() {
     bpmEvents.sort((a, b) => a.tick - b.tick);
     lyrics.sort((a, b) => a.tick - b.tick);
 
+    // 計算每個歌詞的時間（秒）
     let seconds = 0;
     let lastTick = 0;
     let currentBpm = 120;
@@ -80,67 +80,76 @@ export default function MidiLyricsDemo() {
 
     setCurrentSong({ name: file.name, lyrics: lyricsWithTime });
     setCurrentTime(0);
-    lyricsRefs.current = [];
-    lastScrolledIndex.current = -1;
+    setIsPlaying(false);
   };
 
   const handlePlay = () => {
     if (!currentSong) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const startTime = Date.now() - currentTime * 1000;
+
+    setIsPlaying(true);
+    startTimestamp.current = Date.now() - currentTime * 1000;
 
     intervalRef.current = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      if (elapsed > currentSong.lyrics[currentSong.lyrics.length - 1].time + 0.5) {
-        clearInterval(intervalRef.current);
+      const elapsed = (Date.now() - startTimestamp.current) / 1000;
+      const lastTime = currentSong.lyrics[currentSong.lyrics.length - 1]?.time || 0;
+
+      if (elapsed > lastTime + 1) {
+        startTimestamp.current = Date.now();
+        setCurrentTime(0);
+      } else {
+        setCurrentTime(elapsed);
       }
-      setCurrentTime(elapsed);
     }, 50);
   };
 
   const handlePause = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
+    setIsPlaying(false);
   };
 
-  // 自動滾動到當前歌詞
-  useEffect(() => {
-    if (!currentSong) return;
-    const currentIndex = currentSong.lyrics.findIndex(
-      (l, i) =>
-        currentTime >= l.time &&
-        (i === currentSong.lyrics.length - 1 || currentTime < currentSong.lyrics[i + 1].time)
-    );
-    if (currentIndex >= 0 && currentIndex !== lastScrolledIndex.current) {
-      const el = lyricsRefs.current[currentIndex];
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      lastScrolledIndex.current = currentIndex;
-    }
-  }, [currentTime, currentSong]);
+  // 計算滾動距離
+  const getScrollTransform = () => {
+    if (!currentSong) return 0;
+    const speed = 50; // px/s，可自行調整
+    return currentTime * speed;
+  };
 
   return (
-    <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+    <div style={{ fontFamily: "sans-serif", width: "100%" }}>
       <input type="file" accept=".mid,.midi" onChange={handleUpload} />
       {currentSong && (
-        <div>
+        <div style={{ marginTop: "12px" }}>
           <h3>{currentSong.name}</h3>
-          <button onClick={handlePlay}>Play</button>
-          <button onClick={handlePause}>Pause</button>
-          <ul>
-            {currentSong.lyrics.map((l, i) => {
-              const isCurrent =
-                currentTime >= l.time &&
-                (i === currentSong.lyrics.length - 1 || currentTime < currentSong.lyrics[i + 1].time);
-              return (
-                <li
-                  key={i}
-                  ref={(el) => (lyricsRefs.current[i] = el)}
-                  style={{ color: isCurrent ? "red" : "black" }}
-                >
-                  {l.time.toFixed(2)}s - {l.text}
-                </li>
-              );
-            })}
-          </ul>
+          <button onClick={handlePlay} disabled={isPlaying}>Play</button>
+          <button onClick={handlePause} disabled={!isPlaying}>Pause</button>
+
+          <div
+            style={{
+              width: "100%",
+              height: "40px",
+              overflow: "hidden",
+              backgroundColor: "#fff",
+              color: "#000",
+              padding: "8px",
+              marginTop: "12px",
+              whiteSpace: "nowrap",
+              border: "1px solid #ccc",
+              fontSize: "18px"
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                transform: `translateX(-${getScrollTransform()}px)`,
+                transition: "transform 0.05s linear"
+              }}
+            >
+              {currentSong.lyrics.map(l => l.text).join(" ")}
+            </span>
+          </div>
+
+          <div style={{ marginTop: "6px" }}>Time: {currentTime.toFixed(2)}s</div>
         </div>
       )}
     </div>

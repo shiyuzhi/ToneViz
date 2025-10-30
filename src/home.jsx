@@ -24,6 +24,7 @@ export default function Home() {
   const [mouthVisible, setMouthVisible] = useState(false);
   const [voiceVisible, setVoiceVisible] = useState(false);
   const [spectrumVisible, setSpectrumVisible] = useState(false);
+  const [lyricsForDemo, setLyricsForDemo] = useState([]);
 
   const analyserRef = useRef(null);
   const synthsRef = useRef(null);
@@ -35,6 +36,11 @@ export default function Home() {
       { id: 1002, name: "甜蜜蜜", fileUrl: "/midi/甜蜜蜜.mid" },
   ]);
 
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const handleProgress = (progress) => {
+    setCurrentTime(progress);
+  };
   const handleStart = async () => {
     await Tone.start();
     analyserRef.current = new Tone.Analyser("fft", 256);
@@ -109,7 +115,12 @@ export default function Home() {
             
             {/* MIDI 播放器區 */}
             <div style={{ flex: 1, backgroundColor: "#222", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
-              {midiVisible && <MidiPlayer ref={midiPlayerRef} synthsRef={synthsRef} songs={allSongs} onSongLoaded={handleSongLoaded} onSongUploaded={setAllSongs} />}
+              {midiVisible && <MidiPlayer
+              ref={midiPlayerRef}
+              synthsRef={synthsRef}
+              songs={allSongs}
+              onLyricsUpdate={(lyrics) => setLyricsForDemo(lyrics)}
+            />}
             </div>
 
             {/* 辨識區 */}
@@ -120,7 +131,7 @@ export default function Home() {
 
             {/* 歌詞區 */}
             <div style={{ flex: 1, backgroundColor: "#111", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
-              <MidiLyricsDemo />
+             <MidiLyricsDemo lyrics={lyricsForDemo} />
             </div>
 
           </div>
