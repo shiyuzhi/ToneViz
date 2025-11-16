@@ -1,3 +1,4 @@
+// home.jsx
 import React, { useState, useRef } from "react";
 import Start from "./start.jsx";
 import Instrument from "./Instrument.jsx";
@@ -6,7 +7,6 @@ import Spectrum from "./Spectrum.jsx";
 import Keyboard from "./Keyboard.jsx";
 import MouthControl from "./MouthControl.jsx";
 import VoiceControl from "./VoiceControl.jsx";
-import MidiLyricsDemo  from "./MidiLyricsDemo.jsx";
 import DraggableSpectrum from "./DraggableSpectrum.jsx";
 import * as Tone from "tone";
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -18,13 +18,12 @@ export default function Home() {
   const [currentInstrument, setCurrentInstrument] = useState("piano");
   const [octaveOffset, setOctaveOffset] = useState(0);
 
-  const [keyboardVisible, setKeyboardVisible] = useState(true);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [instrumentVisible, setInstrumentVisible] = useState(false);
   const [midiVisible, setMidiVisible] = useState(false);
   const [mouthVisible, setMouthVisible] = useState(false);
   const [voiceVisible, setVoiceVisible] = useState(false);
   const [spectrumVisible, setSpectrumVisible] = useState(false);
-  const [lyricsForDemo, setLyricsForDemo] = useState([]);
 
   const analyserRef = useRef(null);
   const synthsRef = useRef(null);
@@ -111,30 +110,41 @@ export default function Home() {
           </nav>
 
           {/* 選單區改成三欄布局 */}
-          <div className="position-absolute top-0 start-0 end-0" style={{ zIndex: 20, paddingTop: "40px", paddingBottom: "120px", display: "flex", gap: "1rem" }}>
-            
-            {/* MIDI 播放器區 */}
-            <div style={{ flex: 1, backgroundColor: "#222", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
-              {midiVisible && <MidiPlayer
-              ref={midiPlayerRef}
-              synthsRef={synthsRef}
-              songs={allSongs}
-              onLyricsUpdate={(lyrics) => setLyricsForDemo(lyrics)}
-            />}
-            </div>
+          <div className="position-absolute top-0 start-0 end-0" 
+              style={{ zIndex: 20, paddingTop: "40px", paddingBottom: "120px", display: "flex", gap: "1rem" }}>
 
-            {/* 辨識區 */}
+            {/* 左邊：辨識區 */}
             <div style={{ flex: 1, backgroundColor: "#333", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
               {mouthVisible && <MouthControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} onSelectSong={setCurrentSong} />}
               {voiceVisible && <VoiceControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} />}
             </div>
 
-            {/* 歌詞區 */}
-            <div style={{ flex: 1, backgroundColor: "#111", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
-             <MidiLyricsDemo lyrics={lyricsForDemo} />
+            {/* 中間：MIDI 播放器 */}
+            <div style={{ flex: 2, display: "flex", gap: "1rem" }}>
+              {midiVisible && (
+                <MidiPlayer
+                  ref={midiPlayerRef}
+                  synthsRef={synthsRef}
+                  songs={allSongs}
+                  onSongLoaded={handleSongLoaded}
+                />
+              )}
+            </div>
+
+            {/* 右邊：歌詞區 */}
+            <div style={{ flex: 1, backgroundColor: "#222", borderRadius: "8px", padding: "0.5rem", overflowY: "auto" }}>
+              {currentSong && currentSong.lyrics && (
+                <div>
+                  <h5>{currentSong.name}</h5>
+                  <pre style={{ whiteSpace: "pre-wrap" }}>{currentSong.lyrics}</pre>
+                </div>
+              )}
             </div>
 
           </div>
+
+
+
            
            {/*頻譜顯示區*/}
            {spectrumVisible && (

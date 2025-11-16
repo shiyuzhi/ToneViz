@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 
-export default function VisualSpectrumWithVolume({ mode = "bar" }) {
+export default function VisualSpectrumWithVolume() {
+  const [mode,setMode] = useState("bar");
   const canvasRef = useRef();
   const micRef = useRef();
   const fftRef = useRef();
@@ -41,7 +42,7 @@ export default function VisualSpectrumWithVolume({ mode = "bar" }) {
       if (!fftRef.current || !meterRef.current) return;
 
       const data = fftRef.current.getValue(); // -140 ~ 0 dB
-      ctx.fillStyle = "rgba(0,0,0,0.1)";
+      ctx.fillStyle = "#111";
       ctx.fillRect(0, 0, c.width, c.height);
 
       const w = c.width / data.length;
@@ -60,7 +61,8 @@ export default function VisualSpectrumWithVolume({ mode = "bar" }) {
           ctx.beginPath();
           ctx.moveTo(0, midY);
           data.forEach((v, i) => {
-            const y = midY + (v / 50) * midY;
+            const normalized = (v + 140) / 140; 
+            const y = midY -  normalized  * midY;
             ctx.lineTo(i * w, y);
           });
           ctx.strokeStyle = "#4a90e2";
@@ -103,6 +105,13 @@ export default function VisualSpectrumWithVolume({ mode = "bar" }) {
 
   return (
     <div style={{ width: "100%" }}>
+      {/*模式切換*/}
+      <div style={{ display: "flex", gap:"8px",marginBottom: 8}}>
+        <button onClick={() => setMode("bar")}>bar</button>
+        <button onClick={() => setMode("wave")}>wave</button>
+        <button onClick={() => setMode("circle")}>Circles</button>
+      </div>
+
       <div
         style={{
           width: "100%",
@@ -122,7 +131,7 @@ export default function VisualSpectrumWithVolume({ mode = "bar" }) {
           }}
         />
       </div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: "150px", background: "#111", borderRadius: 5 }} />
+      <canvas ref={canvasRef} style={{ width: "100%", height: "120px", background: "#111", borderRadius: 5 }} />
     </div>
   );
 }

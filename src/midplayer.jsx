@@ -1,135 +1,152 @@
-// MidiPlayer.jsx
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useRef } from "react";
 import { Midi } from "@tonejs/midi";
 import * as Tone from "tone";
+import MidiParser from "midi-parser-js";
+import Encoding from "encoding-japanese";
 
-const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSongLoaded, onSongUploaded }, ref) {
-  const [uploadedSongs, setUploadedSongs] = useState([]);
-  const allSongs = [...(songs || []), ...uploadedSongs];
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Upload,
+  Music,
+  Music2,
+  Radio,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { Toaster, toast } from "react-hot-toast";
+
+export default function App() {
+  const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [lyrics, setLyrics] = useState([]);
+  const [currentLyric, setCurrentLyric] = useState("");
 
+  const playbackTimerRef = useRef(null);
   const partRef = useRef(null);
   const lyricPartRef = useRef(null);
-  const durationRef = useRef(0);
-  const rafRef = useRef(null);
-  const volumeRef = useRef(new Tone.Volume(-12).toDestination());
+  const volumeNodeRef = useRef(new Tone.Volume(-12).toDestination());
 
-  // 建立固定 synth，只做一次
-  if (!volumeRef.current.synth) {
-    volumeRef.current.synth = synthsRef?.current?.piano || new Tone.PolySynth().toDestination();
-    volumeRef.current.synth.connect(volumeRef.current);
-  }
-
-  useImperativeHandle(ref, () => ({
-    playSong: (song) => handleLoadSong(song),
-    stop: () => handleStop(),
-    getCurrentSong: () => currentSong
-  }), [currentSong]);
-
-  const updateProgress = () => {
-    setProgress(Tone.Transport.seconds);
-    if (isPlaying) rafRef.current = requestAnimationFrame(updateProgress);
-  };
-
-  useEffect(() => {
-    if (isPlaying) rafRef.current = requestAnimationFrame(updateProgress);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying]);
-
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const midi = new Midi(arrayBuffer);
-    durationRef.current = midi.duration || 0;
-
-    const lyricsSet = new Set();
-    const lyrics = [];
-    midi.tracks.forEach(track => {
-      track.events?.forEach(ev => {
-        if ((ev.subtype === "lyric" || ev.subtype === "text") && ev.text && !lyricsSet.has(ev.text + ev.time)) {
-          lyrics.push({ time: ev.time, text: ev.text });
-          lyricsSet.add(ev.text + ev.time);
-        }
-      });
-    });
-    lyrics.sort((a, b) => a.time - b.time);
-
-    const songObj = { id: Date.now(), name: file.name, file, lyricsJson: lyrics };
-    setUploadedSongs(prev => [...prev, songObj]);
-    onSongUploaded?.([...uploadedSongs, songObj]);
-    onSongLoaded?.(songObj);
-    setCurrentSong(songObj);
-  };
-
-  const handleLoadSong = async (song) => {
-    if (!song) return;
-
-    // 停掉舊 Part
-    if (partRef.current) { partRef.current.stop(); partRef.current.dispose(); partRef.current = null; }
-    if (lyricPartRef.current) { lyricPartRef.current.stop(); lyricPartRef.current.dispose(); lyricPartRef.current = null; }
+  const stopPlayback = () => {
+    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
     Tone.Transport.stop();
-    Tone.Transport.seconds = 0;
-    setProgress(0);
-    setIsPlaying(false);
-    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
+    if (partRef.current) {
+      partRef.current.stop();
+      partRef.current.dispose();
+    }
+    if (lyricPartRef.current) {
+      lyricPartRef.current.stop();
+      lyricPartRef.current.dispose();
+    }
+  };
 
-    setCurrentSong(song);
-
-    let arrayBuffer;
-    if (song.file) arrayBuffer = await song.file.arrayBuffer();
-    else if (song.fileUrl) {
-      const res = await fetch(song.fileUrl);
-      arrayBuffer = await res.arrayBuffer();
+  const handleFileUpload = async (files) => {
+    const midiFiles = Array.from(files).filter(f => f.name.endsWith(".mid") || f.name.endsWith(".midi"));
+    if (!midiFiles.length) {
+      toast.error("請上傳有效的 MIDI 檔案");
+      return;
     }
 
-    const midi = new Midi(arrayBuffer);
-    durationRef.current = midi.duration || 0;
+    const newSongs = await Promise.all(
+      midiFiles.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const midiObj = new Midi(arrayBuffer);
 
-    // 解析歌詞
-    const lyricsSet = new Set();
-    const lyrics = [];
-    midi.tracks.forEach(track => {
-      track.events?.forEach(ev => {
-        if ((ev.subtype === "lyric" || ev.subtype === "text") && ev.text && !lyricsSet.has(ev.text + ev.time)) {
-          lyrics.push({ time: ev.time, text: ev.text });
-          lyricsSet.add(ev.text + ev.time);
-        }
-      });
-    });
-    lyrics.sort((a, b) => a.time - b.time);
+        // Tone.js 用音符事件
+        const events = [];
+        midiObj.tracks.forEach(track =>
+          track.notes.forEach(note => {
+            events.push({
+              time: note.time,
+              note: note.name,
+              duration: note.duration,
+              velocity: note.velocity,
+            });
+          })
+        );
 
-    const songWithLyrics = { ...song, lyricsJson: lyrics };
-    setCurrentSong(songWithLyrics);
-    onSongLoaded?.(songWithLyrics);
+        // midi-parser-js 解析歌詞
+        const reader = new FileReader();
+        const lyrics = await new Promise((resolve) => {
+          reader.onload = (e) => {
+            const bytes = new Uint8Array(e.target.result);
+            const midiData = MidiParser.parse(bytes);
+            const lyricsSet = new Set();
+            const parsedLyrics = [];
+            midiData.track.forEach(track =>
+              track.event.forEach(ev => {
+                if ((ev.type === 5 || ev.type === 1) && ev.data) {
+                  const text = Encoding.convert(ev.data, { to: "UNICODE", type: "string" });
+                  if (!lyricsSet.has(ev.startTime + text)) {
+                    parsedLyrics.push({ time: ev.startTime / 1000, text }); // 秒為單位
+                    lyricsSet.add(ev.startTime + text);
+                  }
+                }
+              })
+            );
+            parsedLyrics.sort((a, b) => a.time - b.time);
+            resolve(parsedLyrics);
+          };
+          reader.readAsArrayBuffer(file);
+        });
 
-    const synth = volumeRef.current.synth;
-
-    // 解析音符
-    const events = [];
-    midi.tracks.forEach(track =>
-      track.notes.forEach(note =>
-        events.push({ time: note.time, note: note.name, duration: note.duration, velocity: note.velocity })
-      )
+        return {
+          id: `${file.name}-${Date.now()}-${Math.random()}`,
+          name: file.name.replace(/\.(mid|midi)$/, ""),
+          file,
+          duration: midiObj.duration || 180,
+          midi: midiObj,
+          events,
+          lyrics,
+        };
+      })
     );
 
+    setSongs(prev => [...prev, ...newSongs]);
+    toast.success(`已新增 ${newSongs.length} 首`);
+
+    if (!currentSong) handleSongSelect(newSongs[0]);
+  };
+
+  const handleSongSelect = async (song) => {
+    if (currentSong?.id === song.id) return;
+    stopPlayback();
+    setCurrentSong(song);
+    setCurrentTime(0);
+    setDuration(song.duration || 180);
+    setIsPlaying(false);
+    setLyrics(song.lyrics || []);
+    setCurrentLyric("");
+    setupTone(song);
+  };
+
+  const setupTone = (song) => {
+    const synth = new Tone.PolySynth().connect(volumeNodeRef.current);
+
+    // 建立音符 Part
     const part = new Tone.Part((time, value) => {
       synth.triggerAttackRelease(value.note, value.duration, time, value.velocity);
-    }, events);
+    }, song.events);
     part.start(0);
     partRef.current = part;
 
-    const lyricPart = new Tone.Part((time, value) => {
-      setCurrentSong(prev => ({ ...prev, lyricsText: (prev.lyricsText || "") + value.text }));
-    }, lyrics.map(l => ({ time: l.time, text: l.text })));
+    // 建立歌詞 Part
+    const lyricPart = new Tone.Part((time, value) => setCurrentLyric(value.text), song.lyrics.map(l => ({ time: l.time, text: l.text })));
     lyricPart.start(0);
     lyricPartRef.current = lyricPart;
   };
 
   const handlePlayPause = async () => {
+    if (!currentSong) {
+      toast.error("請先選擇歌曲");
+      return;
+    }
+
     await Tone.start();
     if (Tone.Transport.state === "started") {
       Tone.Transport.pause();
@@ -137,73 +154,99 @@ const MidiPlayer = forwardRef(function MidiPlayer({ synthsRef, songs = [], onSon
     } else {
       Tone.Transport.start();
       setIsPlaying(true);
-      rafRef.current = requestAnimationFrame(updateProgress);
+
+      playbackTimerRef.current = setInterval(() => setCurrentTime(Tone.Transport.seconds), 100);
     }
   };
 
-  const handleStop = () => {
-    if (partRef.current) partRef.current.stop();
-    if (lyricPartRef.current) lyricPartRef.current.stop();
-    Tone.Transport.stop();
-    Tone.Transport.seconds = 0;
-    setProgress(0);
-    setIsPlaying(false);
-    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
+  const handlePrevious = () => {
+    const idx = songs.findIndex(s => s.id === currentSong?.id);
+    if (idx > 0) handleSongSelect(songs[idx - 1]);
+    else if (songs.length > 0) handleSongSelect(songs[songs.length - 1]);
   };
 
-  const handleSeek = (e) => {
-    const rect = e.target.getBoundingClientRect();
-    const pct = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
-    const newTime = durationRef.current * pct;
-    Tone.Transport.seconds = newTime;
-    if (partRef.current) partRef.current.start(0, newTime);
-    if (lyricPartRef.current) lyricPartRef.current.start(0, newTime);
-    setProgress(newTime);
-    if (currentSong) setCurrentSong(prev => ({ ...prev, lyricsText: "" }));
+  const handleNext = () => {
+    const idx = songs.findIndex(s => s.id === currentSong?.id);
+    if (idx < songs.length - 1) handleSongSelect(songs[idx + 1]);
+    else if (songs.length > 0) handleSongSelect(songs[0]);
   };
 
-  const styles = {
-    wrapper: { maxWidth: "1000px", margin: "2rem auto", padding: "1rem", backgroundColor: "#111", borderRadius: "12px", color: "#eee", fontFamily: "Segoe UI, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.5)", display: "flex", gap: "1rem", alignItems: "flex-start" },
-    songList: { display: "flex", flexDirection: "row", gap: "0.5rem", overflowX: "auto" },
-    songCard: { flex: "0 0 150px", padding: "0.6rem", borderRadius: "10px", background: "#222", textAlign: "center", transition: "transform 0.2s", cursor: "pointer" },
-    songCardActive: { background: "#333", transform: "scale(1.05)" },
-    button: { padding: "0.3rem 0.6rem", margin: "0.2rem", border: "none", borderRadius: "6px", background: "#4a90e2", color: "#fff", cursor: "pointer", transition: "background 0.2s" },
-    controlArea: { display: "flex", flexDirection: "column", gap: "0.5rem", flexGrow: 1 },
-    progressBar: { height: "6px", background: "#333", borderRadius: "3px", marginTop: "0.5rem", cursor: "pointer" },
-    progressFilled: { height: "100%", background: "#4a90e2", borderRadius: "3px", width: durationRef.current ? `${(progress / durationRef.current) * 100}%` : "0%" },
-    timeText: { fontSize: "0.75rem", color: "#888", textAlign: "right", marginTop: "0.2rem" },
+  const formatTime = (seconds) => {
+    if (!isFinite(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
-    <div style={styles.wrapper}>
-      <div style={styles.songList}>
-        {allSongs.map(song => (
-          <div
-            key={song.id}
-            style={{ ...styles.songCard, ...(currentSong?.id === song.id ? styles.songCardActive : {}) }}
-            onClick={() => handleLoadSong(song)}
-          >
-            {song.name}
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg, #2c1810 0%, #1a0f08 50%, #2c1810 100%)", padding: "1rem", fontFamily: "serif", color: "#ffd700" }}>
+      <Toaster />
+      <div style={{ width: "100%", maxWidth: "960px" }}>
+        {/* 標題 */}
+        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+          <div style={{ display: "inline-flex", gap: "0.75rem", alignItems: "center", marginBottom: "0.5rem" }}>
+            <Radio />
+            <h1 style={{ fontSize: "2.5rem", color: "#ffbf00", textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>RETRO MIDI PLAYER</h1>
+            <Radio />
           </div>
-        ))}
-      </div>
-      <div style={styles.controlArea}>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button style={styles.button} onClick={handlePlayPause}>{isPlaying ? "暫停" : "播放"}</button>
-          <button style={styles.button} onClick={handleStop}>停止</button>
+          <p style={{ fontSize: "0.875rem", color: "#ffa500aa", letterSpacing: "0.15em" }}>VINTAGE EDITION</p>
         </div>
-        <div style={styles.progressBar} onClick={handleSeek}>
-          <div style={styles.progressFilled}></div>
-        </div>
-        {durationRef.current > 0 && (
-          <div style={styles.timeText}>
-            {Math.floor(progress / 60)}:{("0" + Math.floor(progress % 60)).slice(-2)} / {Math.floor(durationRef.current / 60)}:{("0" + Math.floor(durationRef.current % 60)).slice(-2)}
+
+        {/* Card */}
+        <div style={{ display: "flex", border: "8px solid #8B4513", background: "linear-gradient(135deg, #3d2817 0%, #2a1810 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1)", overflow: "hidden" }}>
+          {/* 左面板 */}
+          <div style={{ flex: 1, padding: "2rem", position: "relative" }}>
+            {/* Display */}
+            <div style={{ padding: "1rem", marginBottom: "1rem", borderRadius: "0.5rem", border: "4px solid #4a3428", background: "linear-gradient(180deg, #1a1410 0%, #0d0805 100%)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div style={{ width: "64px", height: "64px", borderRadius: "0.5rem", display: "flex", justifyContent: "center", alignItems: "center", background: "radial-gradient(circle at 30% 30%, #ff8c00, #ff6000)" }}>
+                  <Music />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {currentSong ? currentSong.name.toUpperCase() : "NO TRACK SELECTED"}
+                  </p>
+                  <p style={{ fontSize: "0.75rem", color: "#ff8000" }}>MIDI FORMAT</p>
+                  {currentLyric && <p style={{ fontSize: "0.75rem", color: "#ffa500" }}>{currentLyric}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginBottom: "1rem" }}>
+              <button onClick={handlePrevious}><SkipBack /></button>
+              <button onClick={handlePlayPause}>{isPlaying ? <Pause /> : <Play />}</button>
+              <button onClick={handleNext}><SkipForward /></button>
+            </div>
+            
+            {/*上傳*/}
+            <input
+              type="file"
+              accept=".mid,.midi"
+              onChange={e => e.target.files && handleFileUpload(e.target.files)}
+              style={{ width: "100%", marginTop: "0.5rem" }}
+            />
+
+            
+
           </div>
-        )}
-        <input type="file" accept=".mid" onChange={handleUpload} style={{ width: "100%", marginTop: "0.5rem" }} />
+
+          {/* 右面板 */}
+          <div style={{ width: "250px", borderLeft: "8px solid #8B4513", background: "linear-gradient(180deg, #2a1810 0%, #1a0f08 100%)" }}>
+            <div style={{ display: "flex", gap: "0.5rem", padding: "0.5rem", borderBottom: "4px solid #8B4513" }}>
+              <button onClick={() => {}}>列表 ({songs.length})</button>
+              <button disabled={!currentSong}>歌詞</button>
+            </div>
+            <div style={{ padding: "1rem", maxHeight: "300px", overflowY: "auto" }}>
+              {songs.map(song => (
+                <div key={song.id} onClick={() => handleSongSelect(song)} style={{ cursor: "pointer", margin: "0.25rem 0", padding: "0.25rem" }}>
+                  {song.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-});
-
-export default MidiPlayer;
+}
