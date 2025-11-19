@@ -1,0 +1,12 @@
+{
+  "appTitle": "Music System",
+  "menu": "Menu",
+  "keyboard": "Keyboard",
+  "spectrum": "Spectrum",
+  "midiPlayer": "MIDI Player",
+  "mouthControl": "Mouth Control",
+  "voiceControl": "Voice Control",
+  "spectrumModeBar": "Bar",
+  "spectrumModeWave": "Wave",
+  "spectrumModeCircle": "Circle"
+}

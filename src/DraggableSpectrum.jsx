@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import Spectrum from "./Spectrum.jsx";
 
-export default function DraggableSpectrum({ analyserRef }) {
+export default function DraggableSpectrum({ audioNode}) {
   const panelRef = useRef(null);
   const [position, setPosition] = useState({ top: 50, left: 20 });
   const offsetRef = useRef({ x: 0, y: 0 });
@@ -48,7 +48,7 @@ export default function DraggableSpectrum({ analyserRef }) {
         overflow: "hidden",
       }}
     >
-      <Spectrum analyserRef={analyserRef} />
+        <Spectrum audioNode={audioNode} />
     </div>
   );
 }

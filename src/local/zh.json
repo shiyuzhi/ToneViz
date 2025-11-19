@@ -1,0 +1,12 @@
+{
+  "appTitle": "音樂系統",
+  "menu": "功能選單",
+  "keyboard": "鍵盤",
+  "spectrum": "頻譜",
+  "midiPlayer": "MIDI 播放器",
+  "mouthControl": "口型控制",
+  "voiceControl": "聲音控制",
+  "spectrumModeBar": "柱狀",
+  "spectrumModeWave": "波形",
+  "spectrumModeCircle": "圓形"
+}

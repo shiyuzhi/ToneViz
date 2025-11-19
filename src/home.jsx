@@ -12,8 +12,11 @@ import * as Tone from "tone";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import './Home.css';
+import { useTranslation } from "react-i18next";
 
 export default function Home() {
+  const { t, i18n } = useTranslation();
+
   const [started, setStarted] = useState(false);
   const [currentInstrument, setCurrentInstrument] = useState("piano");
   const [octaveOffset, setOctaveOffset] = useState(0);
@@ -60,7 +63,8 @@ export default function Home() {
       }),
     };
 
-    Object.values(synthsRef.current).forEach((synth) => {
+     // 連到 analyser
+     Object.values(synthsRef.current).forEach((synth) => {
       synth.disconnect();
       synth.connect(analyserRef.current);
     });
@@ -84,7 +88,7 @@ export default function Home() {
           {/* Navbar */}
           <nav className="navbar navbar-expand-lg navbar-dark bg-dark position-absolute top-0 w-100" style={{ zIndex: 50 }}>
             <div className="container-fluid">
-              <a className="navbar-brand" href="#">音樂系統</a>
+              <a className="navbar-brand" href="#">{t("appTitle")}</a>
 
               <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
                 <span className="navbar-toggler-icon"></span>
@@ -94,17 +98,23 @@ export default function Home() {
                 <ul className="navbar-nav me-auto mb-2 mb-lg-0">
                   <li className="nav-item dropdown">
                     <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                      功能選單
+                      {t("menu")}
                     </a>
                     <ul className="dropdown-menu">
-                      <li><button className="dropdown-item" onClick={() => setKeyboardVisible(!keyboardVisible)}>鍵盤 {keyboardVisible ? "▼" : "▶"}</button></li>
-                      <li><button className="dropdown-item" onClick={() => setSpectrumVisible(!spectrumVisible)}>頻譜 {spectrumVisible ? "▼" : "▶"}</button></li>
-                      <li><button className="dropdown-item" onClick={() => setMidiVisible(!midiVisible)}>MIDI 播放器 {midiVisible ? "▼" : "▶"}</button></li>
-                      <li><button className="dropdown-item" onClick={() => setMouthVisible(!mouthVisible)}>Mouth Control {mouthVisible ? "▼" : "▶"}</button></li>
-                      <li><button className="dropdown-item" onClick={() => setVoiceVisible(!voiceVisible)}>Voice Control {voiceVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setKeyboardVisible(!keyboardVisible)}>{t("keyboard")} {keyboardVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setSpectrumVisible(!spectrumVisible)}>{t("spectrum")} {spectrumVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setMidiVisible(!midiVisible)}>{t("midiPlayer")} {midiVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setMouthVisible(!mouthVisible)}>{t("mouthControl")} {mouthVisible ? "▼" : "▶"}</button></li>
+                      <li><button className="dropdown-item" onClick={() => setVoiceVisible(!voiceVisible)}>{t("voiceControl")} {voiceVisible ? "▼" : "▶"}</button></li>
                     </ul>
                   </li>
                 </ul>
+
+                {/* Language Switch */}
+                <div className="d-flex ms-auto">
+                  <button className="btn btn-sm btn-outline-light me-1" onClick={() => i18n.changeLanguage("en")}>EN</button>
+                  <button className="btn btn-sm btn-outline-light" onClick={() => i18n.changeLanguage("zh")}>中</button>
+                </div>
               </div>
             </div>
           </nav>
@@ -114,6 +124,8 @@ export default function Home() {
               style={{ zIndex: 20, paddingTop: "40px", paddingBottom: "120px", display: "flex", gap: "1rem" }}>
 
             {/* 左邊：辨識區 */}
+            
+            {/* 辨識區 */}
             <div style={{ flex: 1, backgroundColor: "#333", borderRadius: "8px", padding: "0.1rem", overflowY: "auto" }}>
               {mouthVisible && <MouthControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} onSelectSong={setCurrentSong} />}
               {voiceVisible && <VoiceControl synthsRef={synthsRef} currentInstrument={currentInstrument} midiPlayerRef={midiPlayerRef} currentSong={currentSong} setCurrentSong={setCurrentSong} songs={allSongs} />}
@@ -143,14 +155,10 @@ export default function Home() {
 
           </div>
 
-
-
-           
-           {/*頻譜顯示區*/}
-           {spectrumVisible && (
-              <DraggableSpectrum analyserRef={analyserRef} />
-           )}
-
+          {/* 頻譜顯示區 */}
+          {spectrumVisible && (
+            <DraggableSpectrum audioNode={analyserRef.current} />
+          )}
 
           {/* 下方鍵盤 */}
           {keyboardVisible && (

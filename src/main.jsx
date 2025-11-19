@@ -1,8 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import Home from './home'   // 主入口
+import Home from './home'
+import "./i18n"; 
 
 createRoot(document.getElementById('root')).render(
-    <Home />
+    <StrictMode>
+        <Home />
+    </StrictMode>
 )
 

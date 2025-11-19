@@ -1,11 +1,12 @@
 // src/Spectrum.jsx
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as Tone from "tone";
 
-export default function VisualSpectrumWithVolume() {
-  const [mode,setMode] = useState("bar");
+export default function VisualSpectrumWithVolume({ audioNode }) {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState("bar"); // bar, wave, circle
   const canvasRef = useRef();
-  const micRef = useRef();
   const fftRef = useRef();
   const meterRef = useRef();
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -22,26 +23,23 @@ export default function VisualSpectrumWithVolume() {
     resize();
     window.addEventListener("resize", resize);
 
-    const setupMic = async () => {
-      await Tone.start();
-      const mic = new Tone.UserMedia();
-      const fft = new Tone.FFT(256);
-      const meter = new Tone.Meter();
-      mic.connect(fft);
-      mic.connect(meter);
-      await mic.open();
+    // 只建立 AnalyserNode
+    const fft = new Tone.FFT(256);
+    const meter = new Tone.Meter();
 
-      micRef.current = mic;
-      fftRef.current = fft;
-      meterRef.current = meter;
-    };
-    setupMic();
+    if (audioNode) {
+      audioNode.connect(fft);
+      audioNode.connect(meter);
+    }
+
+    fftRef.current = fft;
+    meterRef.current = meter;
 
     const draw = () => {
       requestAnimationFrame(draw);
       if (!fftRef.current || !meterRef.current) return;
 
-      const data = fftRef.current.getValue(); // -140 ~ 0 dB
+      const data = fftRef.current.getValue();
       ctx.fillStyle = "#111";
       ctx.fillRect(0, 0, c.width, c.height);
 
@@ -57,18 +55,20 @@ export default function VisualSpectrumWithVolume() {
             ctx.fillRect(i * w, c.height - h, w * 0.9, h);
           });
           break;
+
         case "wave":
           ctx.beginPath();
           ctx.moveTo(0, midY);
           data.forEach((v, i) => {
-            const normalized = (v + 140) / 140; 
-            const y = midY -  normalized  * midY;
+            const normalized = (v + 140) / 140;
+            const y = midY - normalized * midY;
             ctx.lineTo(i * w, y);
           });
           ctx.strokeStyle = "#4a90e2";
           ctx.lineWidth = 2;
           ctx.stroke();
           break;
+
         case "circle":
           const radius = 50;
           const cx = c.width / 2;
@@ -99,39 +99,30 @@ export default function VisualSpectrumWithVolume() {
 
     return () => {
       window.removeEventListener("resize", resize);
-      micRef.current?.close();
     };
-  }, [mode]);
+  }, [mode, audioNode]);
 
   return (
     <div style={{ width: "100%" }}>
-      {/*模式切換*/}
-      <div style={{ display: "flex", gap:"8px",marginBottom: 8}}>
-        <button onClick={() => setMode("bar")}>bar</button>
-        <button onClick={() => setMode("wave")}>wave</button>
-        <button onClick={() => setMode("circle")}>Circles</button>
+      <div style={{ display: "flex", gap: "8px", marginBottom: 8 }}>
+        <button onClick={() => setMode("bar")}>{t("spectrumModeBar")}</button>
+        <button onClick={() => setMode("wave")}>{t("spectrumModeWave")}</button>
+        <button onClick={() => setMode("circle")}>{t("spectrumModeCircle")}</button>
       </div>
 
-      <div
-        style={{
-          width: "100%",
-          height: 10,
-          background: "#333",
-          borderRadius: 5,
-          marginBottom: "0.5rem",
-          overflow: "hidden"
-        }}
-      >
+      <div style={{ width: "100%", height: 10, background: "#333", borderRadius: 5, marginBottom: "0.5rem", overflow: "hidden" }}>
         <div
           style={{
             width: `${volumeLevel * 100}%`,
             height: "100%",
             background: volumeLevel > 0.3 ? "#4a90e2" : "#777",
-            transition: "width 0.1s linear"
+            transition: "width 0.1s linear",
           }}
         />
       </div>
+
       <canvas ref={canvasRef} style={{ width: "100%", height: "120px", background: "#111", borderRadius: 5 }} />
     </div>
   );
 }
+
