@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 
-export default function App() {
+export default function  MidiPlayer({onNotesExtracted }) {
   const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -159,19 +159,40 @@ export default function App() {
     toast.success(`已新增 ${newSongs.length} 首`);
 
     if (!currentSong) handleSongSelect(newSongs[0]);
+          // 通知 Home.jsx：我解析好了，給你 notes
+      if (newSongs[0]?.events && onNotesExtracted) {
+        onNotesExtracted(newSongs[0].events);
+      }
   };
 
   // 選擇歌曲
   const handleSongSelect = (song) => {
-    if (currentSong?.id === song.id) return;
-    stopPlayback();
-    setCurrentSong(song);
-    setCurrentTime(0);
-    setDuration(song.duration || 180);
-    setIsPlaying(false);
-    setCurrentLyric("");
-    setupTone(song);
-  };
+  if (currentSong?.id === song.id) return;
+  stopPlayback();
+  setCurrentSong(song);
+  setCurrentTime(0);
+  setDuration(song.duration || 180);
+  setIsPlaying(false);
+  setCurrentLyric("");
+
+  // 檢查 notes / lyrics 結構
+  console.log("notes:", song.events);
+  console.log("lyrics:", song.lyrics);
+
+  song.events.forEach(n => {
+    if (typeof n.time !== "number" || typeof n.note !== "string") {
+      console.warn("note 格式錯誤", n);
+    }
+  });
+
+  song.lyrics.forEach(l => {
+    if (typeof l.time !== "number" || typeof l.text !== "string") {
+      console.warn("lyric 格式錯誤", l);
+    }
+  });
+
+  setupTone(song);
+};
 
   // Tone.js 播放設置
   const setupTone = (song) => {
@@ -201,15 +222,45 @@ export default function App() {
 
   // 播放/暫停
   const handlePlayPause = async () => {
-    if (!currentSong) { toast.error("請先選擇歌曲"); return; }
-    await Tone.start();
-    if (Tone.Transport.state === "started") {
-      Tone.Transport.pause(); setIsPlaying(false);
-    } else {
-      Tone.Transport.start(); setIsPlaying(true);
-      playbackTimerRef.current = setInterval(() => setCurrentTime(Tone.Transport.seconds), 100);
+    if (!currentSong) { 
+      toast.error("請先選擇歌曲"); 
+      return; 
     }
+
+    await Tone.start();
+
+    // 如果已在播放，暫停
+    if (Tone.Transport.state === "started") {
+      Tone.Transport.pause(); 
+      setIsPlaying(false);
+      if (playbackTimerRef.current) {
+        clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
+      return;
+    }
+
+    // 否則開始播放
+    Tone.Transport.start("+0.1", currentTime); // 從 currentTime 開始
+    setIsPlaying(true);
+
+    // 更新進度條
+    playbackTimerRef.current = setInterval(() => {
+      const t = Tone.Transport.seconds;
+      if (t >= duration) {
+        // 播放完畢
+        clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+        setCurrentTime(duration);
+        setIsPlaying(false);
+        Tone.Transport.stop();
+      } else {
+        setCurrentTime(t);
+      }
+    }, 100);
   };
+
+
 
   const handlePrevious = () => {
     const idx = songs.findIndex(s => s.id === currentSong?.id);
@@ -231,9 +282,16 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg, #2c1810 0%, #1a0f08 50%, #2c1810 100%)", padding: "1rem", fontFamily: "serif", color: "#ffd700" }}>
-      <Toaster />
-      <div style={{ width: "100%", maxWidth: "960px" }}>
+    <div style={{ minHeight: "400px", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg, #2c1810 0%, #1a0f08 50%, #2c1810 100%)", padding: "1rem", fontFamily: "serif", color: "#ffd700" }}>
+      <Toaster 
+        position="bottom-center" // 改成底部置中
+        toastOptions={{
+          style: {
+            zIndex: 9999,  // 確保比其他元素高
+          }
+        }}
+      />
+      <div style={{ width: "100%", maxWidth: "1000px" }}>
         <div style={{ textAlign: "center", marginBottom: "1rem" }}>
           <div style={{ display: "inline-flex", gap: "0.75rem", alignItems: "center", marginBottom: "0.5rem" }}>
             <Radio />
@@ -266,7 +324,7 @@ export default function App() {
               <button onClick={handleNext}><SkipForward /></button>
             </div>
             
-            <div style={{ marginBottom: "1rem" }}>
+            <div style={{ marginBottom: "0.5rem" }}>
             {/* 進度條 */}
               <div
                 style={{

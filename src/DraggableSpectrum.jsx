@@ -1,11 +1,17 @@
-import React, { useState, useRef } from "react";
+// src/DraggableSpectrum.jsx
+import React, { useState, useRef, useEffect } from "react";
 import Spectrum from "./Spectrum.jsx";
 
-export default function DraggableSpectrum({ audioNode}) {
+export default function DraggableSpectrum({ notes = [], currentTime = 0 }) {
   const panelRef = useRef(null);
   const [position, setPosition] = useState({ top: 50, left: 20 });
   const offsetRef = useRef({ x: 0, y: 0 });
   const draggingRef = useRef(false);
+
+  useEffect(() => {
+    console.log("DraggableSpectrum收到的notes",notes);
+    console.log("DraggableSpectrum收到的currenttime",currentTime);
+  },[notes,currentTime]);
 
   const handleMouseDown = (e) => {
     draggingRef.current = true;
@@ -48,7 +54,7 @@ export default function DraggableSpectrum({ audioNode}) {
         overflow: "hidden",
       }}
     >
-        <Spectrum audioNode={audioNode} />
+      <Spectrum notes={notes} currentTime={currentTime} />
     </div>
   );
 }

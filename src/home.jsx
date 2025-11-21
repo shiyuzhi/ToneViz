@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 export default function Home() {
   const { t, i18n } = useTranslation();
+  const [notes, setNotes] = useState([]);         // 儲存音符事件
 
   const [started, setStarted] = useState(false);
   const [currentInstrument, setCurrentInstrument] = useState("piano");
@@ -23,7 +24,7 @@ export default function Home() {
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [instrumentVisible, setInstrumentVisible] = useState(false);
-  const [midiVisible, setMidiVisible] = useState(false);
+  const [midiVisible, setMidiVisible] = useState(true);
   const [mouthVisible, setMouthVisible] = useState(false);
   const [voiceVisible, setVoiceVisible] = useState(false);
   const [spectrumVisible, setSpectrumVisible] = useState(false);
@@ -77,6 +78,11 @@ export default function Home() {
     setCurrentSong(songWithLyrics);
     setAllSongs(prev => prev.find(s => s.id === songWithLyrics.id) ? prev : [...prev, songWithLyrics]);
   };
+  
+  const handleNotesFromPlayer = (events) => {
+    setNotes(events);
+    setSpectrumVisible(true); // 讓頻譜立即出現
+  };
 
   return (
     <>
@@ -120,7 +126,7 @@ export default function Home() {
           </nav>
 
           {/* 選單區改成三欄布局 */}
-          <div className="position-absolute top-0 start-0 end-0" 
+          <div className="position-absolute top-2 start-0 end-0" 
               style={{ zIndex: 20, paddingTop: "40px", paddingBottom: "120px", display: "flex", gap: "1rem" }}>
 
             {/* 左邊：辨識區 */}
@@ -139,6 +145,7 @@ export default function Home() {
                   synthsRef={synthsRef}
                   songs={allSongs}
                   onSongLoaded={handleSongLoaded}
+                  onNotesExtracted={handleNotesFromPlayer}
                 />
               )}
             </div>
@@ -157,7 +164,7 @@ export default function Home() {
 
           {/* 頻譜顯示區 */}
           {spectrumVisible && (
-            <DraggableSpectrum audioNode={analyserRef.current} />
+            <DraggableSpectrum notes={notes} currentTime={currentTime} />
           )}
 
           {/* 下方鍵盤 */}
@@ -171,3 +178,5 @@ export default function Home() {
     </>
   );
 }
+
+
